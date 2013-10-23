@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <set>
 #include <map>
 #include <time.h>
 #include <string>
@@ -41,6 +42,83 @@ namespace bonnie
         puts (mystring);
     }
 
+
+
+    /*************************** Vector Operation ****************************************/
+
+    // Initialize a class T vector(using REFERENCE instead of POINTER) from a file exiting at path
+
+    template <class T>
+
+        void initVector(std::vector<T> &vec, std::string path)
+        {
+            vec.clear();
+            FILE * pFile = fopen (path.c_str(), "r");
+            if (pFile == NULL) 
+                perror ("Error opening file");
+            else
+            {
+                std::cout << "\nTSET IS HERE\n";
+                ignoreFirstLine(pFile);
+                while(true)
+                {
+                    if(feof(pFile))
+                    {
+                        std::cout << "It is EOF\n";
+                        break;
+                    }
+                    T t;
+                    t.setupFromFile(pFile);
+                    //       t.print();
+                    vec.push_back(t);
+                    //std::cout << "VEC SIZE is " << vec.size() << std::endl;
+                }
+                fclose (pFile);
+            }
+        }
+
+    // Show vector storing primitives
+
+    template <class T>
+
+        void showPrimitiveVector(std::vector<T> &vec)
+        {
+            typename std::vector<T>::iterator it;
+            for(it = vec.begin(); it!=vec.end(); it++)
+            {
+                //std::cout << "Print a element in the vector\n";
+                std::cout << (*it);
+                std::cout << std::endl;
+            }
+        }
+    // Show all the element in the class T vector(using REFERENCE instead of POINTER)
+
+    template <class T>
+
+        void showVector(std::vector<T> &vec)
+        {
+            typename std::vector<T>::iterator it;
+            for(it = vec.begin(); it!=vec.end(); it++)
+            {
+                //std::cout << "Print a element in the vector\n";
+                (*it).print();
+                std::cout << std::endl;
+            }
+        }
+
+    template <class T>
+
+        void showPointerVector(std::vector<T> &vec)
+        {
+            typename std::vector<T>::iterator it;
+            for(it = vec.begin(); it!=vec.end(); it++)
+            {
+                //std::cout << "Print a element in the vector\n";
+                (*it)->printBasicInfo();
+            }
+        }
+
+
     /******************************* Train Static Properties **************************************/
 
     // Reuse
@@ -63,6 +141,7 @@ namespace bonnie
             }
     };
 
+    std::vector<Reuse> reusesVec;
 
     // parameters
 
@@ -77,6 +156,35 @@ namespace bonnie
     void showParameters()
     {
     }
+
+    // arrDepSequences: 
+    // all arrivals and departures have a Arr/DepSeq 
+    // which can lead them to the exact tracGroup to use and the rank in sequence
+
+    class ArrDepSequence
+    {
+        public:
+            char type; // A or D
+            int seqID, trackGroup, rankInSequence;
+            ArrDepSequence(){}
+            ~ArrDepSequence(){}
+
+            void setupFromFile(FILE * pFile)
+            {
+                type = fgetc(pFile);
+                fgetc(pFile);
+                fgetc(pFile);
+                fscanf(pFile, "Seq%d;TrackGroup%d;%d;\n", &seqID, &trackGroup, &rankInSequence);
+            }
+
+            void print()
+            {
+                std::cout << type << seqID << " trackGroup" << trackGroup 
+                    << " rankInSequence " << rankInSequence << std::endl;
+            }
+    }; 
+
+    std::vector<ArrDepSequence> arrDepSequencesVec;
 
     // Category Information
 
@@ -93,12 +201,11 @@ namespace bonnie
 
             void setupFromFile(FILE * pFile)
             {   
-                trainCategory temp;
-                fscanf(pFile, "Cat%d;", &temp.id);
-                fscanf(pFile, "%d;CatGroup%d;%d;", &temp.length, &temp.catGroup, &temp.maxDBM);
-                fscanf(pFile, "%d:%d:%d;", &temp.maxTBM.tm_hour, &temp.maxTBM.tm_min, &temp.maxTBM.tm_sec);
-                fscanf(pFile, "%d:%d:%d;", &temp.maintTimeD.tm_hour, &temp.maintTimeD.tm_min, &temp.maintTimeD.tm_sec);
-                fscanf(pFile, "%d:%d:%d;\n", &temp.maintTimeT.tm_hour, &temp.maintTimeT.tm_min, &temp.maintTimeT.tm_sec);
+                fscanf(pFile, "Cat%d;", &id);
+                fscanf(pFile, "%d;CatGroup%d;%d;", &length, &catGroup, &maxDBM);
+                fscanf(pFile, "%d:%d:%d;", &maxTBM.tm_hour, &maxTBM.tm_min, &maxTBM.tm_sec);
+                fscanf(pFile, "%d:%d:%d;", &maintTimeD.tm_hour, &maintTimeD.tm_min, &maintTimeD.tm_sec);
+                fscanf(pFile, "%d:%d:%d;\n", &maintTimeT.tm_hour, &maintTimeT.tm_min, &maintTimeT.tm_sec);
             }   
 
             void print()
@@ -108,6 +215,8 @@ namespace bonnie
                     << " maintTimeTMin " << maintTimeT.tm_min << std::endl;
             }       
     };
+
+    std::vector<trainCategory> trainCategoriesVec;
 
     /************************************* Train Dynamic Properties **************************************/
 
@@ -124,7 +233,9 @@ namespace bonnie
             tm remTBM;
             int arrSeq;
             int jointArr;
+            int jointArrPosition;
             int dep;
+            std::vector<int> prefPlats;
 
         public:
             Arrival() {}
@@ -139,10 +250,12 @@ namespace bonnie
                 char c;
                 c = fgetc(pFile);
                 if(c==';') jointArr = -1;
-                else fscanf(pFile, "ointArr%d;", &jointArr);
+                else if(c=='J') fscanf(pFile, "ointArr%d;", &jointArr);
+                else std::cout << arrivalID << " ATTENTION!!!!!!!!!!!!! " << c << std::endl;
                 c = fgetc(pFile);
                 if(c==';') dep = -1;
-                else fscanf(pFile, "ep%d", &dep); 
+                else if(c=='D') fscanf(pFile, "ep%d;", &dep); 
+                else std::cout << "ATTENTION!!!!!!!!!!!!! " << c << std::endl;
                 fscanf(pFile, "Cat%d;", &category);
                 fscanf(pFile, "%d:%d:%d;", &idealDwell.tm_hour, &idealDwell.tm_min, &idealDwell.tm_sec);
                 fscanf(pFile, "%d:%d:%d;", &maxDwell.tm_hour, &maxDwell.tm_min, &maxDwell.tm_sec);
@@ -159,10 +272,173 @@ namespace bonnie
                 std::cout << maxDwell.tm_hour << " " << maxDwell.tm_min << " " << maxDwell.tm_sec << std::endl;
                 std::cout << remDBM << std::endl;
                 std::cout << remTBM.tm_hour << " " << remTBM.tm_min << " " << remTBM.tm_sec << std::endl;
+                std::cout << "**********Prefered Platforms are:\n";
+                showPrimitiveVector(prefPlats);
+                if(jointArr==-1) std::cout << "There is no joint departure" << std::endl;
+                else
+                    std::cout << "**********joint position is:" << jointArrPosition << std::endl;
             }
     };
 
+    class Departure // need revision
+    {
+        public:
+            tm time;
+            tm idealDwell;
+            tm maxDwell;
+            int departureID;
+            int reqDBM;
+            tm reqTBM;
+            int depSeq;
+            int jointDep;
+            int jointDepPosition;
+            std::vector<int> prefPlats;
+            int compatibleCategory;
 
+        public:
+            Departure() {}
+            ~Departure() {}
+
+            // read a line in the pFile to get an Arrival info and assign them to 'arrivial'
+            void setupFromFile(FILE * pFile) 
+            {
+                //std::cout << "Departure set up from file\n";
+                fscanf(pFile, "Dep%d;", &departureID);
+                fscanf(pFile, "d%d %d:%d:%d;", &time.tm_mday, &time.tm_hour, &time.tm_min, &time.tm_sec);
+                fscanf(pFile, "DepSeq%d;", &depSeq);
+                char c = fgetc(pFile);
+                if(c == 'J') 
+                    fscanf(pFile, "ointDep%d;", &jointDep);
+                else
+                    jointDep = -1;
+                fscanf(pFile, "%d:%d:%d;", &idealDwell.tm_hour, &idealDwell.tm_min, &idealDwell.tm_sec);
+                fscanf(pFile, "%d:%d:%d;", &maxDwell.tm_hour, &maxDwell.tm_min, &maxDwell.tm_sec);
+                fscanf(pFile, "%d;", &reqDBM);
+                fscanf(pFile, "%d:%d:%d;\n", &reqTBM.tm_hour, &reqTBM.tm_min, &reqTBM.tm_sec);
+            }
+
+            void print()//incomplete
+            {
+                std::cout << "departureID " << departureID << "\n";
+                std::cout << time.tm_mday << " " << time.tm_hour <<  " " << time.tm_min << " " << time.tm_sec << std::endl;
+                std::cout << depSeq << " " << jointDep << " " <<  "\n ";
+                std::cout << idealDwell.tm_hour << " " << idealDwell.tm_min << " " << idealDwell.tm_sec << std::endl;
+                std::cout << maxDwell.tm_hour << " " << maxDwell.tm_min << " " << maxDwell.tm_sec << std::endl;
+                std::cout << reqDBM << std::endl;
+                std::cout << reqTBM.tm_hour << " " << reqTBM.tm_min << " " << reqTBM.tm_sec << std::endl;
+                std::cout << "**********Prefered Platforms are:\n";
+                showPrimitiveVector(prefPlats);
+                if(jointDep==-1) std::cout << "There is no joint departure" << std::endl;
+                else
+                    std::cout << "**********joint position is:" << jointDepPosition << std::endl;
+                std::cout << "**********compatible category is:" << compatibleCategory;
+                std::cout << std::endl;
+            }
+    };
+
+    std::vector<Arrival> allArrivalsVec;
+
+    std::vector<Departure> allDeparturesVec;
+
+    // read files to setup all preferred platforms for all arrivals and departures
+
+    void setupPrefPlats(std::string path) 
+    {
+        FILE * pFile = fopen (path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+        {
+            ignoreFirstLine(pFile);
+            char c;
+            int a, b;
+            while(true)
+            {
+                if(feof(pFile)) break;
+                c = fgetc(pFile);
+                if(c=='A')
+                {
+                    fscanf(pFile, "rr%d;Platform%d;\n", &a, &b);
+                    allArrivalsVec[a-1].prefPlats.push_back(b);
+                }
+                if(c=='D')
+                {
+                    fscanf(pFile, "ep%d;Platform%d;\n", &a, &b);
+                    allDeparturesVec[a-1].prefPlats.push_back(b);
+                }
+
+            }
+            fclose(pFile);
+        }
+    }
+
+    // read files to setup all joint position sequence for all arrivals and departures
+
+    void setupJointPosition(std::string path) 
+    {
+        FILE * pFile = fopen (path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+        {
+            ignoreFirstLine(pFile);
+            char c;
+            int jointNum, num, positionInSeq;
+            while(true)
+            {
+                if(feof(pFile)) break;
+                for(int i=0; i<6; i++)
+                    c = fgetc(pFile);
+                if(c=='A')
+                {
+                    fscanf(pFile, "rr%d;Arr%d;%d;\n", &jointNum, &num, &positionInSeq);
+                    if(allArrivalsVec[num-1].jointArr != jointNum)
+                    {
+                        std::cout << "JointArr does not correspond to Arr\n";
+                        std::cout << "allArrivalsVec[" << num-1 << "].jointArr is " 
+                            << allArrivalsVec[num-1].jointArr 
+                            << " but jointNum is " << jointNum << std::endl;
+                    }
+                    else
+                        allArrivalsVec[num-1].jointArrPosition = positionInSeq;
+                }
+                if(c=='D')
+                {
+                    fscanf(pFile, "ep%d;Dep%d;%d;\n", &jointNum, &num, &positionInSeq);
+                    if(allDeparturesVec[num-1].jointDep != jointNum)
+                    {
+                        std::cout << "JointDep does not correspond to Dep\n";
+                    }
+                    else
+                        allDeparturesVec[num-1].jointDepPosition = positionInSeq;
+                }
+
+            }
+            fclose(pFile);
+            std::cout << "Joint Position in Sequence is set up.\n";
+        }
+    }
+
+    // read files to setup all compatible train categories for all departures
+
+    void setupCompCatDep(std::string path) 
+    {
+        FILE * pFile = fopen (path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+        {
+            ignoreFirstLine(pFile);
+            int depID, compCat;
+            while(true)
+            {
+                if(feof(pFile)) break;
+                fscanf(pFile, "Dep%d;Cat%d;\n", &depID, &compCat);
+                allDeparturesVec[depID-1].compatibleCategory = compCat;
+            }
+            fclose(pFile);
+        }
+    }
     /******************************************** Train **********************************************/
 
     class Train
@@ -175,6 +451,8 @@ namespace bonnie
             tm remTBM;
             int arrivalID;
             //need good variable for departure (reuse.csv, changable)
+            std::string schedule;
+
         public:
             Train() {}
             ~Train() {}
@@ -213,101 +491,111 @@ namespace bonnie
             }
     };
 
-    /*************************** Vector Operation ****************************************/
 
     std::vector<Train> allTrainsVec;
 
-    std::vector<Arrival> allArrivalsVec;
+    void initAllTrainsVec(std::string initialInTrainsFilePath)
+    {
+        // get all the initial in trains
+        FILE * pFile = fopen(initialInTrainsFilePath.c_str(), "r");
+        if(pFile == NULL)
+            perror ("Error opening file");
+        else
+        {
+            ignoreFirstLine(pFile);
+            while(true)
+            {
+                if(feof(pFile)) break;
+                Train t;
+                t.setupTheInitialInTrainFromFile(pFile);
+                allTrainsVec.push_back(t);
+            }
+            fclose(pFile);
+
+            // get arriving trains
+            for(int i=0; i<allArrivalsVec.size(); i++)
+            {
+                Train t;
+                t.setupFromAnArrival(allArrivalsVec[i]);
+                allTrainsVec.push_back(t);
+            }
+        }
+
+    }
 
     std::vector<trainCategory> allTrainCategoriesVec; // trainCategories.id = vector[id-1]
 
     std::vector<reusePair> reusePairsVec;
-
-    // Initialize a class T vector(using REFERENCE instead of POINTER) from a file exiting at path
-
-    template <class T>
-
-        void initVector(std::vector<T> &vec, std::string path)
-        {
-            vec.clear();
-            FILE * pFile = fopen (path.c_str(), "r");
-            if (pFile == NULL) 
-                perror ("Error opening file");
-            else
-            {
-                std::cout << "\nTSET IS HERE\n";
-                ignoreFirstLine(pFile);
-                while(true)
-                {
-                    if(feof(pFile))
-                    {
-                        std::cout << "It is EOF\n";
-                        break;
-                    }
-                    T t;
-                    t.setupFromFile(pFile);
-                    t.print();
-                    vec.push_back(t);
-                    //std::cout << "VEC SIZE is " << vec.size() << std::endl;
-                }
-                fclose (pFile);
-            }
-        }
-
-    // Show all the element in the class T vector(using REFERENCE instead of POINTER)
-
-    template <class T>
-
-        void showVector(std::vector<T> &vec)
-        {
-            typename std::vector<T>::iterator it;
-            for(it = vec.begin(); it!=vec.end(); it++)
-            {
-                std::cout << "Print a element in the vector\n";
-                (*it).print();
-                std::cout << std::endl;
-            }
-        }
-
 
     /****************************************** RESOURCES ************************************************/
 
     // The base class for all the resource
     class Resource
     {
-        public:
-            int resourceType;
-            std::vector<Resource*> gateANeighbours;
-            std::vector<Resource*> gateBNeighbours;
-            Resource() {}
-            Resource(int n) { resourceType = n; }
-            ~Resource() {}
-
-            void setResourceType(int n)
-            {
-                resourceType = n;
-            }
-
-            void addNeighbour(char AorB, Resource* rp)
-            {
-                if(rp==NULL) std::cout << "rp is NULL\n";
-                else
+        class NeighbourResource
+        {
+            public:
+                Resource* rp;
+                char gateType;
+                int gateID;
+                void print()
                 {
-                    std::cout << "here\n";
-                    (*rp).print();
-                    std::cout << "here\n";
-                    if(AorB == 'A')
-                        gateANeighbours.push_back(rp);
-                    else
-                        gateBNeighbours.push_back(rp);
-                    std::cout << gateANeighbours.size() << " " <<gateBNeighbours.size() << std::endl;
+                    rp->printBasicInfo();
+                    std::cout << gateType << " " << gateID << std::endl;
                 }
-            }
+        };
+        public:
+        int resourceType;
+        std::vector<NeighbourResource> gateANeighbours;
+        std::vector<NeighbourResource> gateBNeighbours;
+        std::vector<int> compatibleCategories;   
+        std::set<Train> currentTrains;
 
-            virtual void print()
+        Resource() {}
+        Resource(int n) { resourceType = n; }
+        ~Resource() {}
+
+        void setResourceType(int n)
+        {
+            resourceType = n;
+        }
+
+        void addNeighbour(char AorB, Resource* rp, char neighbourGateType, int neighbourGateID)
+        {
+            if(rp==NULL) std::cout << "rp is NULL\n";
+            else
             {
-                std::cout << "printResource from base class\n";
+                std::cout << "here\n";
+                (*rp).print();
+                NeighbourResource temp;
+                temp.rp = rp;
+                temp.gateType = neighbourGateType;
+                temp.gateID = neighbourGateID;
+                std::cout << "here\n";
+                if(AorB == 'A')
+                    gateANeighbours.push_back(temp);
+                else
+                    gateBNeighbours.push_back(temp);
+                std::cout << gateANeighbours.size() << " " <<gateBNeighbours.size() << std::endl;
             }
+        }
+
+        virtual void print(){}
+
+        virtual void printBasicInfo(){}
+
+        void printNeighbours()
+        {
+            //put here for test (temporarily)
+            std::cout << "compatible categories:\n";
+            showPrimitiveVector(compatibleCategories);
+
+            std::cout << "Neighbours:\ngateA:\n";
+            showVector(gateANeighbours);
+            std::cout << "gateB:\n";
+            showVector(gateBNeighbours);
+            std::cout << std::endl;
+        }
     };
 
     class TrackGroups: public Resource
@@ -323,13 +611,26 @@ namespace bonnie
                 fscanf(pFile, "%d:%d:%d;", &trTime.tm_hour, &trTime.tm_min, &trTime.tm_sec);
                 fscanf(pFile, "%d:%d:%d;\n", &hwTime.tm_hour, &hwTime.tm_min, &hwTime.tm_sec);
             }   
-            void print()
+            void printBasicInfo()
             {   
-                //std::cout << "printResource from extends class\n";
                 std::cout << "trackGroupsid " << id 
                     << " trTimeMin " << trTime.tm_min 
                     << " hwTimeMin " << hwTime.tm_min << std::endl;
             }
+            void print()
+            {
+                printBasicInfo();
+                printNeighbours();
+            }
+            /*
+               void printNeighbours()
+               {
+               std::cout << "Neighbours:\ngateA:\n";
+               showPointerVector(gateANeighbours);
+               std::cout << "gateB:\n";
+               showPointerVector(gateBNeighbours);
+               std::cout << std::endl;
+               }*/
     };
 
     std::vector<TrackGroups> trackGroupsVec;
@@ -345,10 +646,14 @@ namespace bonnie
                 fscanf(pFile, "Platform%d;%d;\n", &id, &length);
             }   
 
+            void printBasicInfo()
+            {
+                std::cout << "platformid " << id << " length " << length << std::endl;
+            }
             void print()
             {
-                //std::cout << "printResource from extends class\n";
-                std::cout << "platformid " << id << " length " << length << std::endl;
+                printBasicInfo();
+                printNeighbours();
             }
     };
     std::vector<Platform> platformsVec;
@@ -364,11 +669,15 @@ namespace bonnie
             {   
                 fscanf(pFile, "Facility%d;%c;%d;\n", &id, &type, &length);
             }   
-            void print()
+            void printBasicInfo()
             {   
-                std::cout << "printResource from extends class\n";
                 std::cout << "facilityid " << id << 
                     " type " << type << " length " << length << std::endl;
+            }
+            void print()
+            {
+                printBasicInfo();
+                printNeighbours();
             }
     };
 
@@ -385,12 +694,16 @@ namespace bonnie
             {
                 fscanf(pFile, "SingleTrack%d;%d;%d;\n", &id, &length, &capa);
             }
-            void print()
+            void printBasicInfo()
             {   
-                std::cout << "printResource from extends class\n";
                 std::cout << "SingleTrackid " << id 
                     << " length " << length
                     << " capa " << capa << std::endl;
+            }
+            void print()
+            {
+                printBasicInfo();
+                printNeighbours();
             }
     };
 
@@ -405,21 +718,67 @@ namespace bonnie
             {
                 fscanf(pFile, "Yard%d;%d;\n", &id, &capa);
             }
-            void print()
+            void printBasicInfo()
             {   
-                std::cout << "printResource from extends class\n";
                 std::cout << "yardid " << id << " capa " << capa << std::endl;
+            }
+            void print()
+            {
+                printBasicInfo();
+                printNeighbours();
             }
     };
 
     std::vector<Yard> yardsVec;
 
+    void setupCompCatResFromFile(std::string path)
+    {
+        int resID, catID;
+        char c;
+        FILE * pFile = fopen (path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+        {
+            ignoreFirstLine(pFile);
+            while(true)
+            {
+                if(feof(pFile)) break;
+                c = fgetc(pFile);
+                switch(c)
+                {
+                    case 'F':
+                        fscanf(pFile,"acility%d;Cat%d;\n", &resID, &catID);
+                        facilitiesVec[resID-1].compatibleCategories.push_back(catID);
+                        break;
+                    case 'T':
+                        fscanf(pFile, "rackGroup%d;Cat%d;\n", &resID, &catID);
+                        trackGroupsVec[resID-1].compatibleCategories.push_back(catID);
+                        break;
+                    case 'P':
+                        fscanf(pFile,"latform%d;Cat%d;\n", &resID, &catID);
+                        platformsVec[resID-1].compatibleCategories.push_back(catID);
+                        break;
+                    case 'S':
+                        fscanf(pFile,"ingleTrack%d;Cat%d;\n", &resID, &catID);
+                        singleTracksVec[resID-1].compatibleCategories.push_back(catID);
+                        break;
+                    case 'Y':
+                        fscanf(pFile,"ard%d;Cat%d;\n", &resID, &catID);
+                        yardsVec[resID-1].compatibleCategories.push_back(catID);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+    /*** SET UP THE NEIGHBOUR RELATIONSHIPS BETWEEN RESOURCES ***/
 
     char rGateSide, nGateSide; // the resource gate side; the neighbour gate side
     int rNum, nNum, rGatei, nGatei;
     Resource* neighbour;
 
-    /*** SET UP THE NEIGHBOUR RELATIONSHIPS BETWEEN RESOURCES ***/
 
     // According the neighbour info, assign its address to 'neighbour' Resource pointer
     void switchNC(char nc, FILE* pFile)
@@ -468,7 +827,7 @@ namespace bonnie
                     nc = fgetc(pFile); // get the neighour name's first character
                     switchNC(nc, pFile); // assigned the neighbour object's address to 'neighbour'
                     Facility &theResourceP = facilitiesVec[rNum-1]; // use reference(alias): get the resource
-                    theResourceP.addNeighbour(rGateSide, neighbour); 
+                    theResourceP.addNeighbour(rGateSide, neighbour, nGateSide, nGatei); 
                     // add 'neighbour' pointer to the resource's 'rGateSide'(A or B) neighbour vector 
                     break;
                 }
@@ -479,7 +838,7 @@ namespace bonnie
                     nc = fgetc(pFile);
                     switchNC(nc, pFile);
                     Platform &theResourceP = platformsVec[rNum-1];
-                    theResourceP.addNeighbour(rGateSide, neighbour);
+                    theResourceP.addNeighbour(rGateSide, neighbour, nGateSide, nGatei);
                     break;
                 }
 
@@ -489,7 +848,7 @@ namespace bonnie
                     nc = fgetc(pFile);
                     switchNC(nc, pFile);
                     SingleTrack &theResourceP = singleTracksVec[rNum-1];
-                    theResourceP.addNeighbour(rGateSide, neighbour);
+                    theResourceP.addNeighbour(rGateSide, neighbour, nGateSide, nGatei);
                     break;
                 }
 
@@ -500,7 +859,7 @@ namespace bonnie
                     switchNC(nc, pFile);
                     std::cout << "Is neighbour == NULL? " << (neighbour==NULL) << std::endl;
                     TrackGroups &theResourceP = trackGroupsVec[rNum-1];
-                    theResourceP.addNeighbour(rGateSide, neighbour);
+                    theResourceP.addNeighbour(rGateSide, neighbour, nGateSide, nGatei);
                     break;
                 }
 
@@ -510,7 +869,7 @@ namespace bonnie
                     nc = fgetc(pFile);
                     switchNC(nc, pFile);
                     Yard &theResourceP = yardsVec[rNum-1];
-                    theResourceP.addNeighbour(rGateSide, neighbour);
+                    theResourceP.addNeighbour(rGateSide, neighbour, nGateSide, nGatei);
                     break;
                 }
         }
@@ -534,21 +893,6 @@ namespace bonnie
             fclose(pFile);
         }
     }
-
-    // incomplete!!
-    template <class T>
-
-        void showNeighbours(std::vector<T> &vec)
-        {
-            typename std::vector<T>::iterator it;
-            for(it = vec.begin(); it!=vec.end(); it++)
-            {
-                std::cout << "Print a element in the vector\n";
-                (*it).print();
-                std::cout << std::endl;
-            }
-        }
-
 
 }
 #endif
