@@ -24,6 +24,11 @@ int main()
      std::cout << "***********************************************\n";
     setupCompCatResFromFile("Data//compCatRes.csv");
 
+    // These two methods have not been tested with output yet!!!!!!!!!!!
+    setupImposedConsumptionsFromFile("Data//imposedConsumptions.csv");
+    setupParametersFromFile("Data//parameters.csv");
+
+
 /********** have read in all the files except 'parameter.csv' and 'imposedConsumptions.csv' ***/
 
     // showVector(allArrivalsVec);

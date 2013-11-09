@@ -1,3 +1,7 @@
+/*
+ * Last Update: Nov 8
+ * State: Can read in all csv files
+ */
 #include <iostream>
 #include <vector>
 #include <set>
@@ -131,6 +135,7 @@ namespace bonnie
 
             void setupFromFile(FILE * pFile)
             {
+
                 fscanf(pFile, "Arr%d;Dep%d;\n", &rp.first, &rp.second);
             }
 
@@ -149,10 +154,108 @@ namespace bonnie
     int junCost, disjCost, platAsgCost, reuseCost, nbDays, maxMaint;
     double remDCost, remTCost, dwellCost;
 
-    void readParameters()
+    void readParameters(FILE* pFile) // waiting for test with more than one instance.
     {
+        ignoreFirstLine(pFile);
+        char c, cc;
+        while(true)
+        {
+            if(feof(pFile)) break;
+            c = fgetc(pFile);
+            switch(c)
+            {
+                case 'j':
+                    for(int i=0; i<3; i++)
+                        c = fgetc(pFile);
+                    switch(c)
+                    {
+                        case 'T':
+                            fscanf(pFile, "ime;%d:%d:%d;\n", &junTime.tm_hour, &junTime.tm_min, &junTime.tm_sec);
+                            break;
+                        case 'C':
+                            fscanf(pFile, "ost;%d;\n", &junCost);
+                            break;
+                    }
+                    break;
+                case 'd':
+                    for(int i=0; i<4; i++)
+                        c = fgetc(pFile);
+                    switch(c)
+                    {
+                        case 'T':
+                            fscanf(pFile, "isjTime;%d:%d:%d;\n", &disjTime.tm_hour, &disjTime.tm_min, &disjTime.tm_sec);
+                            break;
+                        case 'C':
+                            fscanf(pFile, "ost;%d;\n", &disjCost);
+                            break;
+                        case 'l':
+                            fscanf(pFile, "Cost;%lf;\n", &dwellCost); // look up scanf double
+                            break;
+                    }
+                    break;
+                case 'r':
+                    for(int i=0; i<2; i++)
+                        c = fgetc(pFile);
+                    switch(c)
+                    {
+                        case 'v':
+                            fscanf(pFile, "Time;%d:%d:%d;\n", &revTime.tm_hour, &revTime.tm_min, &revTime.tm_sec);
+                            break;
+                        case 'm':
+                            c = fgetc(pFile);
+                            switch(c)
+                            {
+                                case 'D':
+                                    fscanf(pFile, "Cost;%lf;\n", &remDCost); // look up scanf double
+                                    break;
+                                case 'T':
+                                    fscanf(pFile, "Cost;%lf;\n", &remTCost); // look up scanf double
+                                    break;
+                            }
+                            break;
+                        case 'u':
+                            fscanf(pFile, "seCost;%d;\n", &reuseCost);
+                            break;
+                    }
+                    break;
+                case 'p':
+                    fscanf(pFile, "latAsgCost;%d;\n", &platAsgCost);
+                    break;
+                case 'n':
+                    fscanf(pFile, "bDays;%d;\n", &nbDays);
+                    break;
+                case 'm':
+                    for(int i=0; i<3; i++)
+                        c = fgetc(pFile);
+                    switch(c)
+                    {
+                        case 'A':
+                            fscanf(pFile, "sbTime;%d:%d:%d;\n", &minAsbTime.tm_hour, &minAsbTime.tm_min, &minAsbTime.tm_sec);
+                            break;
+                        case 'R':
+                            fscanf(pFile, "esTime;%d:%d:%d;\n", &minResTime.tm_hour, &minResTime.tm_min, &minResTime.tm_sec);
+                            break;
+                        case 'D':
+                            fscanf(pFile, "wellTime;%d:%d:%d;\n", &maxDwellTime.tm_hour, &maxDwellTime.tm_min, &maxDwellTime.tm_sec);
+                            break;
+                        case 'M':
+                            fscanf(pFile, "aint;%d;\n", &maxMaint);
+                            break;
+                    }
+                    break;
+            }
+        }
     }
 
+    void setupParametersFromFile(std::string path)
+    {
+        FILE * pFile = fopen( path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+            readParameters(pFile);
+        fclose(pFile);
+    }
     void showParameters()
     {
     }
@@ -544,8 +647,22 @@ namespace bonnie
                     std::cout << gateType << " " << gateID << std::endl;
                 }
         };
+
+        protected:
+        class ImposedConsumption // anything concerning this class needs testing. btw, union?
+        {
+            public:
+                // 0 no consumption; 'F'-'A' Facility; 'Y'-'A' Yard; 'T'-'A' TrackGroup
+                tm begTime, endTime;
+                int nb;
+                char originGateC, destinationGateC;
+                int originGateN, destinationGateN;
+                tm entranceTime;
+        };
+
         public:
         int resourceType;
+        std::vector<ImposedConsumption> imposedConsumptions;
         std::vector<NeighbourResource> gateANeighbours;
         std::vector<NeighbourResource> gateBNeighbours;
         std::vector<int> compatibleCategories;   
@@ -559,6 +676,8 @@ namespace bonnie
         {
             resourceType = n;
         }
+
+        virtual void addImposedConsumption(FILE* pFile){}
 
         void addNeighbour(char AorB, Resource* rp, char neighbourGateType, int neighbourGateID)
         {
@@ -622,6 +741,16 @@ namespace bonnie
                 printBasicInfo();
                 printNeighbours();
             }
+            void addImposedConsumption(FILE* pFile)
+            {
+                //fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;%c%d;%c;%d;d%d %d:%d:%d;\n", &)
+                ImposedConsumption temp;
+                fscanf(pFile, ";;;%c%d;%c;%d;d%d %d:%d:%d;\n", 
+                        &temp.originGateC, &temp.originGateN, &temp.destinationGateC, &temp.destinationGateN,
+                        &temp.entranceTime.tm_mday, &temp.entranceTime.tm_hour, &temp.entranceTime.tm_min,
+                        &temp.entranceTime.tm_sec);
+                imposedConsumptions.push_back(temp);
+            }
             /*
                void printNeighbours()
                {
@@ -655,6 +784,17 @@ namespace bonnie
                 printBasicInfo();
                 printNeighbours();
             }
+            void addImposedConsumption(FILE* pFile)
+            {
+                //fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;%c%d;%c;%d;d%d %d:%d:%d;\n", &)
+                ImposedConsumption temp;
+                fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;;;;;;\n", 
+                        &temp.begTime.tm_mday, &temp.begTime.tm_hour, &temp.begTime.tm_min,
+                        &temp.begTime.tm_sec, 
+                        &temp.endTime.tm_mday, &temp.endTime.tm_hour, &temp.endTime.tm_min,
+                        &temp.endTime.tm_sec);
+                imposedConsumptions.push_back(temp);
+            }
     };
     std::vector<Platform> platformsVec;
 
@@ -678,6 +818,17 @@ namespace bonnie
             {
                 printBasicInfo();
                 printNeighbours();
+            }
+            void addImposedConsumption(FILE* pFile)
+            {
+                //fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;%c%d;%c;%d;d%d %d:%d:%d;\n", &)
+                ImposedConsumption temp;
+                fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;;;;;;\n", 
+                        &temp.begTime.tm_mday, &temp.begTime.tm_hour, &temp.begTime.tm_min,
+                        &temp.begTime.tm_sec, 
+                        &temp.endTime.tm_mday, &temp.endTime.tm_hour, &temp.endTime.tm_min,
+                        &temp.endTime.tm_sec);
+                imposedConsumptions.push_back(temp);
             }
     };
 
@@ -705,6 +856,17 @@ namespace bonnie
                 printBasicInfo();
                 printNeighbours();
             }
+            void addImposedConsumption(FILE* pFile)
+            {
+                //fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;%c%d;%c;%d;d%d %d:%d:%d;\n", &)
+                ImposedConsumption temp;
+                fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;;;;;;\n", 
+                        &temp.begTime.tm_mday, &temp.begTime.tm_hour, &temp.begTime.tm_min,
+                        &temp.begTime.tm_sec, 
+                        &temp.endTime.tm_mday, &temp.endTime.tm_hour, &temp.endTime.tm_min,
+                        &temp.endTime.tm_sec);
+                imposedConsumptions.push_back(temp);
+            }
     };
 
     std::vector<SingleTrack> singleTracksVec;
@@ -726,6 +888,18 @@ namespace bonnie
             {
                 printBasicInfo();
                 printNeighbours();
+            }
+            void addImposedConsumption(FILE* pFile)
+            {
+                //fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;%c%d;%c;%d;d%d %d:%d:%d;\n", &)
+                ImposedConsumption temp;
+                fscanf(pFile, "d%d %d:%d:%d;d%d %d:%d:%d;%d;;;;;\n", 
+                        &temp.begTime.tm_mday, &temp.begTime.tm_hour, &temp.begTime.tm_min,
+                        &temp.begTime.tm_sec, 
+                        &temp.endTime.tm_mday, &temp.endTime.tm_hour, &temp.endTime.tm_min,
+                        &temp.endTime.tm_sec,
+                        &temp.nb);
+                imposedConsumptions.push_back(temp);
             }
     };
 
@@ -773,6 +947,54 @@ namespace bonnie
             }
         }
     }
+
+    // add imposedComsumptions
+    void readImposedConsumption(FILE* pFile) 
+    {
+        int resID;
+        char c;
+        ignoreFirstLine(pFile);
+        while(true)
+        {
+            if(feof(pFile)) break;
+            c = fgetc(pFile);
+            switch(c)
+            {
+                case 'F':
+                    fscanf(pFile,"acility%d;", &resID);
+                    facilitiesVec[resID-1].addImposedConsumption(pFile);
+                    break;
+                case 'T':
+                    fscanf(pFile, "rackGroup%d;", &resID);
+                    facilitiesVec[resID-1].addImposedConsumption(pFile);
+                    break;
+                case 'P':
+                    fscanf(pFile,"latform%d;", &resID);
+                    facilitiesVec[resID-1].addImposedConsumption(pFile);
+                    break;
+                case 'S':
+                    fscanf(pFile,"ingleTrack%d;", &resID);
+                    facilitiesVec[resID-1].addImposedConsumption(pFile);
+                    break;
+                case 'Y':
+                    fscanf(pFile,"ard%d;", &resID);
+                    facilitiesVec[resID-1].addImposedConsumption(pFile);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    void setupImposedConsumptionsFromFile(std::string path)
+    {
+        FILE * pFile = fopen (path.c_str(), "r");
+        if (pFile == NULL)
+            perror ("Error opening file");
+        else
+            readImposedConsumption(pFile);
+    }
+
     /*** SET UP THE NEIGHBOUR RELATIONSHIPS BETWEEN RESOURCES ***/
 
     char rGateSide, nGateSide; // the resource gate side; the neighbour gate side
